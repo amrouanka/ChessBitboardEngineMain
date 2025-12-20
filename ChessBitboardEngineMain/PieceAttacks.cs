@@ -57,6 +57,44 @@ public static class PieceAttacks
 	public static ulong[,] pawnAttacks = new ulong[2, 64];
     public static ulong[] knightAttacks = new ulong[64];
     public static ulong[] kingAttacks = new ulong[64];
+    public static readonly int[] BishopRelevantBits = {
+        6, 5, 5, 5, 5, 5, 5, 6, 
+        5, 5, 5, 5, 5, 5, 5, 5, 
+        5, 5, 7, 7, 7, 7, 5, 5, 
+        5, 5, 7, 9, 9, 7, 5, 5, 
+        5, 5, 7, 9, 9, 7, 5, 5, 
+        5, 5, 7, 7, 7, 7, 5, 5, 
+        5, 5, 5, 5, 5, 5, 5, 5, 
+        6, 5, 5, 5, 5, 5, 5, 6
+    };
+
+    public static readonly int[] RookRelevantBits = {
+        12, 11, 11, 11, 11, 11, 11, 12, 
+        11, 10, 10, 10, 10, 10, 10, 11, 
+        11, 10, 10, 10, 10, 10, 10, 11, 
+        11, 10, 10, 10, 10, 10, 10, 11, 
+        11, 10, 10, 10, 10, 10, 10, 11, 
+        11, 10, 10, 10, 10, 10, 10, 11, 
+        11, 10, 10, 10, 10, 10, 10, 11, 
+        12, 11, 11, 11, 11, 11, 11, 12
+    };
+
+    public static ulong SetOccupancy(int index, int bitsInMask, ulong attackMask)
+    {
+        ulong occupancy = 0UL;
+
+        for (int count = 0; count < bitsInMask; count++)
+        {
+            int square = GetLs1bIndex(attackMask);
+
+            attackMask &= attackMask - 1;
+
+            if ((index & (1 << count)) != 0)
+                occupancy |= 1UL << square;
+        }
+
+        return occupancy;
+    }
 
     public static ulong MaskPawnAttacks(int side, int square)
     {
@@ -99,7 +137,7 @@ public static class PieceAttacks
 
     }
 
-    static ulong MaskKingAttacks(int square)
+    public static ulong MaskKingAttacks(int square)
     {
         ulong attacks = 0UL;
         ulong bitboard = 0UL;
@@ -119,7 +157,7 @@ public static class PieceAttacks
         return attacks;
     }
 
-    static ulong MaskBishopAttacks(int square)
+    public static ulong MaskBishopAttacks(int square)
     {
         ulong attacks = 0UL;
 
@@ -141,7 +179,7 @@ public static class PieceAttacks
         return attacks;
     }
 
-    static ulong MaskRookAttacks(int square)
+    public static ulong MaskRookAttacks(int square)
     {
         ulong attacks = 0UL;
 
@@ -163,7 +201,7 @@ public static class PieceAttacks
         return attacks;
     }
 
-    static ulong BishopAttacksOnTheFly(int square, ulong block)
+    public static ulong BishopAttacksOnTheFly(int square, ulong block)
     {
         ulong attacks = 0UL;
 
@@ -201,7 +239,7 @@ public static class PieceAttacks
         return attacks;
     }
 
-    static ulong RookAttacksOnTheFly(int square, ulong block)
+    public static ulong RookAttacksOnTheFly(int square, ulong block)
     {
         ulong attacks = 0UL;
 
