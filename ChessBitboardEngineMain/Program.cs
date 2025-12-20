@@ -7,14 +7,6 @@ class Program
     static void Main()
     {
         InitLeapersAttacks();
-
-        PrintBitboard(GetRandomU32());
-
-        PrintBitboard(GetRandomU32() & 0xFFFF); // slice 16 bits
-
-        PrintBitboard(GetRandomU64());
-
-        PrintBitboard(GenerateMagicNumber());
     }
 
     static void PrintBitboard(ulong bitboard)
@@ -96,6 +88,9 @@ class Program
 
         return -1;
     }
+}
+
+/*
 
     // pseudo random number state
     public static uint randomState = 1804289383u;
@@ -134,4 +129,80 @@ class Program
             & GetRandomU64()
             & GetRandomU64();
     }
-}
+    public static ulong FindMagicNumber(int square, int relevantBits, Piece piece)
+    {
+        // init occupancies
+        ulong[] occupancies = new ulong[4096];
+
+        // init attack tables
+        ulong[] attacks = new ulong[4096];
+
+        // init used attacks
+        ulong[] usedAttacks = new ulong[4096];
+
+        // init attack mask for current piece
+        ulong attackMask = piece == Piece.bishop
+            ? MaskBishopAttacks(square)
+            : MaskRookAttacks(square);
+
+        // init occupancy indices
+        int occupancyIndices = 1 << relevantBits;
+
+        // loop over occupancy indices
+        for (int index = 0; index < occupancyIndices; index++)
+        {
+            occupancies[index] = SetOccupancy(index, relevantBits, attackMask);
+
+            attacks[index] = piece == Piece.bishop
+                ? BishopAttacksOnTheFly(square, occupancies[index])
+                : RookAttacksOnTheFly(square, occupancies[index]);
+        }
+
+        // test magic numbers
+        for (int randomCount = 0; randomCount < 100_000_000; randomCount++)
+        {
+            ulong magicNumber = GenerateMagicNumber();
+
+            // skip weak magic numbers
+            if (CountBits((attackMask * magicNumber) & 0xFF00000000000000UL) < 6)
+                continue;
+
+            // reset used attacks
+            Array.Clear(usedAttacks, 0, usedAttacks.Length);
+
+            bool fail = false;
+
+            // test magic indexing
+            for (int index = 0; index < occupancyIndices && !fail; index++)
+            {
+                int magicIndex = (int)((occupancies[index] * magicNumber) >> (64 - relevantBits));
+
+                if (usedAttacks[magicIndex] == 0UL)
+                {
+                    usedAttacks[magicIndex] = attacks[index];
+                }
+                else if (usedAttacks[magicIndex] != attacks[index])
+                {
+                    fail = true;
+                }
+            }
+
+            // magic number works
+            if (!fail)
+                return magicNumber;
+        }
+
+        Console.WriteLine("Magic number fails!");
+        return 0UL;
+    }
+    public static void InitMagicNumbers()
+    {
+        for (int square = 0; square < 64; square++)
+            rookMagicNumbers[square] =
+                FindMagicNumber(square, rookRelevantBits[square], Piece.rook);
+
+        for (int square = 0; square < 64; square++)
+            bishopMagicNumbers[square] =
+                FindMagicNumber(square, bishopRelevantBits[square], Piece.bishop);
+    }
+*/

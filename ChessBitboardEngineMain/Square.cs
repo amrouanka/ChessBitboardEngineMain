@@ -11,3 +11,5 @@ public enum Square
 }
 
 public enum Color {white, black}
+
+public enum Piece {rook, bishop};
