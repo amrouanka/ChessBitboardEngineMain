@@ -4,9 +4,140 @@ using static PieceAttacks;
 
 class Program
 {
+    public const string EmptyBoard = "8/8/8/8/8/8/8/8 w - - ";
+    public const string StartPosition = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    public const string TrickyPosition = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1";
+    public const string KillerPosition = "rnbqkb1r/pp1p1pPp/8/2p1pP2/1P1P4/3P3P/P1P1P3/RNBQKBNR w KQkq e6 0 1";
+    public const string CmkPosition = "r2q1rk1/ppp2ppp/2n1bn2/2b1p3/3pP3/3P1NPP/PPP1NPB1/R1BQ1RK1 b - - 0 1";
+
     static void Main()
     {
-        InitLeapersAttacks();
+        InitAll();
+
+        ParseFEN(StartPosition);
+        PrintBoard();
+
+        PrintAttackedSquares((int)Side.black);
+    }
+
+    // ASCII pieces
+    public static readonly char[] asciiPieces = "PNBRQKpnbrqk".ToCharArray();
+
+    // Encoded piece constants
+    public const int P = 0, N = 1, B = 2, R = 3, Q = 4, K = 5;
+    public const int p = 6, n = 7, b = 8, r = 9, q = 10, k = 11;
+
+    // map ASCII characters to piece constants
+    public static readonly Dictionary<char, int> charPieces = new()
+    {
+        ['P'] = P,
+        ['N'] = N,
+        ['B'] = B,
+        ['R'] = R,
+        ['Q'] = Q,
+        ['K'] = K,
+        ['p'] = p,
+        ['n'] = n,
+        ['b'] = b,
+        ['r'] = r,
+        ['q'] = q,
+        ['k'] = k
+    };
+
+    // piece bitboards
+    public static ulong[] bitboards = new ulong[12];
+
+    // occupancy bitboards ((int)Color.white, (int)Color.black, both)
+    public static ulong[] occupancies = new ulong[3];
+
+    // side to move (-1 = none, 0 = (int)Color.white, 1 = (int)Color.black)
+    public static int side = -1;
+
+    // enpassant square
+    public static int enPassant = (int) noSquare;
+
+    // castling rights
+    public static int castle;
+
+    public static void ParseFEN(string fen)
+    {
+        // reset board position (bitboards)
+        Array.Fill(bitboards, 0UL);
+
+        // reset occupancies (bitboards)
+        Array.Fill(occupancies, 0UL);
+
+        // reset game state variables
+        side = 0;
+        enPassant = (int)Square.noSquare;
+        castle = 0;
+
+        int rank = 0, file = 0;
+        for (int i = 0; i < fen.Length && rank < 8; i++)
+        {
+            char c = fen[i];
+
+            // match ascii pieces
+            if (char.IsLetter(c))
+            {
+                int piece = charPieces[c];
+                SetBit(ref bitboards[piece], rank * 8 + file);
+                file++;
+            }
+            // match empty squares
+            else if (char.IsDigit(c))
+            {
+                file += c - '0';
+            }
+            // rank separator
+            else if (c == '/')
+            {
+                rank++;
+                file = 0;
+            }
+            // end of piece placement
+            else if (c == ' ')
+            {
+                i++;
+                // side to move
+                side = (fen[i] == 'w') ? (int)Side.white : (int)Side.black;
+                i += 2; // skip space after side
+
+                // castling rights
+                while (fen[i] != ' ')
+                {
+                    switch (fen[i])
+                    {
+                        case 'K': castle |= (int)CastlingRights.wk; break;
+                        case 'Q': castle |= (int)CastlingRights.wq; break;
+                        case 'k': castle |= (int)CastlingRights.bk; break;
+                        case 'q': castle |= (int)CastlingRights.bq; break;
+                    }
+                    i++;
+                }
+
+                i++; // en passant
+                if (fen[i] != '-')
+                {
+                    int epFile = fen[i] - 'a';
+                    int epRank = 8 - (fen[i + 1] - '0');
+                    enPassant = epRank * 8 + epFile;
+                }
+                else
+                    enPassant = (int)Square.noSquare;
+
+                break; // done parsing
+            }
+        }
+
+        // populate occupancies
+        for (int piece = P; piece <= K; piece++)
+            occupancies[(int)Side.white] |= bitboards[piece];
+
+        for (int piece = p; piece <= k; piece++)
+            occupancies[(int)Side.black] |= bitboards[piece];
+
+        occupancies[(int)Side.both] = occupancies[(int)Side.white] | occupancies[(int)Side.black];
     }
 
     static void PrintBitboard(ulong bitboard)
@@ -39,6 +170,45 @@ class Program
 
         // print bitboard as unsigned decimal number
         Console.WriteLine($"     Bitboard: {bitboard}\n");
+    }
+
+    public static void PrintBoard()
+    {
+        Console.WriteLine();
+
+        for (int rank = 0; rank < 8; rank++)
+        {
+            for (int file = 0; file < 8; file++)
+            {
+                int square = rank * 8 + file;
+
+                if (file == 0)
+                    Console.Write($"  {8 - rank} ");
+
+                int piece = -1;
+
+                for (int bbPiece = (int)Piece.P; bbPiece <= (int)Piece.k; bbPiece++)
+                {
+                    if (GetBit(bitboards[bbPiece], square))
+                        piece = bbPiece;
+                }
+
+                Console.Write($" {(piece == -1 ? '.' : asciiPieces[piece])}");
+            }
+
+            Console.WriteLine();
+        }
+
+        Console.WriteLine("\n     a b c d e f g h\n");
+
+        Console.WriteLine($"     Side:     {(side == 0 ? "white" : "black")}");
+
+        Console.WriteLine($"     Enpassant:   {(enPassant != (int)noSquare ? SquareToCoordinates[enPassant] : "no")}");
+
+        Console.WriteLine($"     Castling:  {( (castle & (int)CastlingRights.wk) != 0 ? 'K' : '-')}" +
+                        $"{( (castle & (int)CastlingRights.wq) != 0 ? 'Q' : '-')}" +
+                        $"{( (castle & (int)CastlingRights.bk) != 0 ? 'k' : '-')}" +
+                        $"{( (castle & (int)CastlingRights.bq) != 0 ? 'q' : '-')}\n");
     }
 
     public static void SetBit(ref ulong bitboard, int square)

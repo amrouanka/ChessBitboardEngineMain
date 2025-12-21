@@ -1,6 +1,6 @@
 using System;
 using static Program;
-using static Color;
+using static Side;
 
 public static class PieceAttacks
 {
@@ -57,6 +57,7 @@ public static class PieceAttacks
 	public static ulong[,] pawnAttacks = new ulong[2, 64];
     public static ulong[] knightAttacks = new ulong[64];
     public static ulong[] kingAttacks = new ulong[64];
+
     public static readonly int[] bishopRelevantBits =
     {
         6, 5, 5, 5, 5, 5, 5, 6, 
@@ -213,6 +214,7 @@ public static class PieceAttacks
         0x06000020202D0240UL,
         0x8918844842082200UL,
         0x4010011029020020UL,
+        0x8040201008040200UL
     };
 
     public static ulong SetOccupancy(int index, int bitsInMask, ulong attackMask)
@@ -424,5 +426,156 @@ public static class PieceAttacks
 
             kingAttacks[square] = MaskKingAttacks(square);
         }
+    }
+
+    // bishop attack masks
+    public static ulong[] bishopMasks = new ulong[64];
+
+    // rook attack masks
+    public static ulong[] rookMasks = new ulong[64];
+
+    // bishop attacks table [square][occupancies]
+    public static ulong[,] bishopAttacks = new ulong[64, 512];
+
+    // rook attacks table [square][occupancies]
+    public static ulong[,] rookAttacks = new ulong[64, 4096];
+
+    // init slider attacks (bishop = true for bishop, false for rook)
+    public static void InitSliderAttacks(bool bishop)
+    {
+        for (int square = 0; square < 64; square++)
+        {
+            bishopMasks[square] = MaskBishopAttacks(square);
+            rookMasks[square] = MaskRookAttacks(square);
+
+            ulong attackMask = bishop ? bishopMasks[square] : rookMasks[square];
+            int relevantBitsCount = CountBits(attackMask);
+            int occupancyIndices = 1 << relevantBitsCount;
+
+            for (int index = 0; index < occupancyIndices; index++)
+            {
+                ulong occupancy = SetOccupancy(index, relevantBitsCount, attackMask);
+                int magicIndex;
+
+                if (bishop)
+                {
+                    ulong x = bishopMagicNumbers[square];
+                    int y = bishopRelevantBits[square];
+                    magicIndex = (int)((occupancy * bishopMagicNumbers[square]) >> (64 - bishopRelevantBits[square]));
+                    bishopAttacks[square, magicIndex] = BishopAttacksOnTheFly(square, occupancy);
+                }
+                else
+                {
+                    magicIndex = (int)((occupancy * rookMagicNumbers[square]) >> (64 - rookRelevantBits[square]));
+                    rookAttacks[square, magicIndex] = RookAttacksOnTheFly(square, occupancy);
+                }
+            }
+        }
+    }
+
+    // get bishop attacks
+    public static ulong GetBishopAttacks(int square, ulong occupancy)
+    {
+        occupancy &= bishopMasks[square];
+        occupancy *= bishopMagicNumbers[square];
+        occupancy >>= 64 - bishopRelevantBits[square];
+        return bishopAttacks[square, occupancy];
+    }
+
+    // get rook attacks
+    public static ulong GetRookAttacks(int square, ulong occupancy)
+    {
+        occupancy &= rookMasks[square];
+        occupancy *= rookMagicNumbers[square];
+        occupancy >>= 64 - rookRelevantBits[square];
+        return rookAttacks[square, occupancy];
+    }
+
+    // get queen attacks
+    public static ulong GetQueenAttacks(int square, ulong occupancy)
+    {
+        // bishop attacks
+        ulong bishopOccupancy = occupancy & bishopMasks[square];
+        bishopOccupancy *= bishopMagicNumbers[square];
+        bishopOccupancy >>= 64 - bishopRelevantBits[square];
+        ulong queenAttacks = bishopAttacks[square, bishopOccupancy];
+
+        // rook attacks
+        ulong rookOccupancy = occupancy & rookMasks[square];
+        rookOccupancy *= rookMagicNumbers[square];
+        rookOccupancy >>= 64 - rookRelevantBits[square];
+        queenAttacks |= rookAttacks[square, rookOccupancy];
+
+        return queenAttacks;
+    }
+
+    public static void InitAll()
+    {
+        // init leaper pieces attacks
+        InitLeapersAttacks();
+
+        // init slider pieces attacks
+        InitSliderAttacks(true);
+        InitSliderAttacks(false);
+    }
+
+    // is square currently attacked by given side
+    public static int IsSquareAttacked(int square, int side)
+    {
+        // attacked by white pawns
+        if (side == (int)white && (pawnAttacks[(int)black, square] & bitboards[P]) != 0)
+            return 1;
+
+        // attacked by black pawns
+        if (side == (int)black && (pawnAttacks[(int)white, square] & bitboards[p]) != 0)
+            return 1;
+
+        // attacked by knights
+        if ((knightAttacks[square] & (side == (int)white ? bitboards[N] : bitboards[n])) != 0)
+            return 1;
+
+        // attacked by bishops
+        if ((GetBishopAttacks(square, occupancies[(int)both]) &
+            (side == (int)white ? bitboards[B] : bitboards[b])) != 0)
+            return 1;
+
+        // attacked by rooks
+        if ((GetRookAttacks(square, occupancies[(int)both]) &
+            (side == (int)white ? bitboards[R] : bitboards[r])) != 0)
+            return 1;
+
+        // attacked by queens
+        if ((GetQueenAttacks(square, occupancies[(int)both]) &
+            (side == (int)white ? bitboards[Q] : bitboards[q])) != 0)
+            return 1;
+
+        // attacked by kings
+        if ((kingAttacks[square] & (side == (int)white ? bitboards[K] : bitboards[k])) != 0)
+            return 1;
+
+        return 0;
+    }
+
+    // print attacked squares
+    public static void PrintAttackedSquares(int side)
+    {
+        Console.WriteLine();
+
+        for (int rank = 0; rank < 8; rank++)
+        {
+            for (int file = 0; file < 8; file++)
+            {
+                int square = rank * 8 + file;
+
+                if (file == 0)
+                    Console.Write($"  {8 - rank} ");
+
+                Console.Write($" {IsSquareAttacked(square, side)}");
+            }
+
+            Console.WriteLine();
+        }
+
+        Console.WriteLine("\n     a b c d e f g h\n");
     }
 }
