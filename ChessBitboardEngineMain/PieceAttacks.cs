@@ -1,6 +1,8 @@
 using System;
 using static Program;
 using static Side;
+using static Square;
+using static CastlingRights;
 
 public static class PieceAttacks
 {
@@ -216,6 +218,340 @@ public static class PieceAttacks
         0x4010011029020020UL,
         0x8040201008040200UL
     };
+// generate all moves
+    public static void GenerateMoves()
+    {
+        int sourceSquare, targetSquare;
+        ulong bitboard, attacks;
+
+        for (int piece = (int)P; piece <= (int)k; piece++)
+        {
+            bitboard = bitboards[piece];
+
+            // ================= WHITE =================
+            if (side == (int)white)
+            {
+                if (piece == (int)P)
+                {
+                    while (bitboard != 0)
+                    {
+                        sourceSquare = GetLs1bIndex(bitboard);
+                        targetSquare = sourceSquare - 8;
+
+                        if (!(targetSquare < (int)a8) && !GetBit(occupancies[(int)both], targetSquare))
+                        {
+                            if (sourceSquare >= (int)a7 && sourceSquare <= (int)h7)
+                            {
+                                Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[targetSquare]}q pawn promotion");
+                                Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[targetSquare]}r pawn promotion");
+                                Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[targetSquare]}b pawn promotion");
+                                Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[targetSquare]}n pawn promotion");
+                            }
+                            else
+                            {
+                                Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[targetSquare]} pawn push");
+
+                                if (sourceSquare >= (int)a2 && sourceSquare <= (int)h2 &&
+                                    !GetBit(occupancies[(int)both], targetSquare - 8))
+                                {
+                                    Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[targetSquare - 8]} double pawn push");
+                                }
+                            }
+                        }
+
+                        attacks = pawnAttacks[(int)side, sourceSquare] & occupancies[(int)black];
+
+                        while (attacks != 0)
+                        {
+                            targetSquare = GetLs1bIndex(attacks);
+
+                            if (sourceSquare >= (int)a7 && sourceSquare <= (int)h7)
+                            {
+                                Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[targetSquare]}q pawn promotion capture");
+                                Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[targetSquare]}r pawn promotion capture");
+                                Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[targetSquare]}b pawn promotion capture");
+                                Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[targetSquare]}n pawn promotion capture");
+                            }
+                            else
+                            {
+                                Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[targetSquare]} pawn capture");
+                            }
+
+                            PopBit(ref attacks, targetSquare);
+                        }
+
+                        if (enPassant != (int)noSquare)
+                        {
+                            ulong epAttacks =
+                                pawnAttacks[(int)side, sourceSquare] & (1UL << enPassant);
+
+                            if (epAttacks != 0)
+                            {
+                                int epTarget = GetLs1bIndex(epAttacks);
+                                Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[epTarget]} pawn enPassant capture");
+                            }
+                        }
+
+                        PopBit(ref bitboard, sourceSquare);
+                    }
+                }
+
+                if (piece == (int)K)
+                {
+                    if ((castle & (int)wk) != 0 &&
+                        !GetBit(occupancies[(int)both], (int)f1) &&
+                        !GetBit(occupancies[(int)both], (int)g1) &&
+                        (IsSquareAttacked((int)e1, (int)black) != 0) &&
+                        (IsSquareAttacked((int)f1, (int)black) != 0))
+                    {
+                        Console.WriteLine("e1g1 castling move");
+                    }
+
+                    if ((castle & (int)wq) != 0 &&
+                        !GetBit(occupancies[(int)both], (int)d1) &&
+                        !GetBit(occupancies[(int)both], (int)c1) &&
+                        !GetBit(occupancies[(int)both], (int)b1) &&
+                        (IsSquareAttacked((int)e1, (int)black) != 0) &&
+                        (IsSquareAttacked((int)d1, (int)black) != 0))
+                    {
+                        Console.WriteLine("e1c1 castling move");
+                    }
+                }
+            }
+
+            // ================= BLACK =================
+            else
+            {
+                if (piece == (int)p)
+                {
+                    while (bitboard != 0)
+                    {
+                        sourceSquare = GetLs1bIndex(bitboard);
+                        targetSquare = sourceSquare + 8;
+
+                        if (!(targetSquare > (int)h1) &&
+                            !GetBit(occupancies[(int)both], targetSquare))
+                        {
+                            if (sourceSquare >= (int)a2 && sourceSquare <= (int)h2)
+                            {
+                                Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[targetSquare]}q pawn promotion");
+                                Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[targetSquare]}r pawn promotion");
+                                Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[targetSquare]}b pawn promotion");
+                                Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[targetSquare]}n pawn promotion");
+                            }
+                            else
+                            {
+                                Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[targetSquare]} pawn push");
+
+                                if (sourceSquare >= (int)a7 && sourceSquare <= (int)h7 &&
+                                    !GetBit(occupancies[(int)both], targetSquare + 8))
+                                {
+                                    Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[targetSquare + 8]} double pawn push");
+                                }
+                            }
+                        }
+
+                        attacks = pawnAttacks[(int)side, sourceSquare] & occupancies[(int)white];
+
+                        while (attacks != 0)
+                        {
+                            targetSquare = GetLs1bIndex(attacks);
+
+                            if (sourceSquare >= (int)a2 && sourceSquare <= (int)h2)
+                            {
+                                Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[targetSquare]}q pawn promotion capture");
+                                Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[targetSquare]}r pawn promotion capture");
+                                Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[targetSquare]}b pawn promotion capture");
+                                Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[targetSquare]}n pawn promotion capture");
+                            }
+                            else
+                            {
+                                Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[targetSquare]} pawn capture");
+                            }
+
+                            PopBit(ref attacks, targetSquare);
+                        }
+
+                        if (enPassant != (int)noSquare)
+                        {
+                            ulong epAttacks =
+                                pawnAttacks[(int)side, sourceSquare] & (1UL << enPassant);
+
+                            if (epAttacks != 0)
+                            {
+                                int epTarget = GetLs1bIndex(epAttacks);
+                                Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[epTarget]} pawn enPassant capture");
+                            }
+                        }
+
+                        PopBit(ref bitboard, sourceSquare);
+                    }
+                }
+
+                if (piece == (int)k)
+                {
+                    if ((castle & (int)bk) != 0 &&
+                        !GetBit(occupancies[(int)both], (int)f8) &&
+                        !GetBit(occupancies[(int)both], (int)g8) &&
+                        (IsSquareAttacked((int)e8, (int)white) != 0) &&
+                        (IsSquareAttacked((int)f8, (int)white) != 0))
+                    {
+                        Console.WriteLine("e8g8 castling move");
+                    }
+
+                    if ((castle & (int)bq) != 0 &&
+                        !GetBit(occupancies[(int)both], (int)d8) &&
+                        !GetBit(occupancies[(int)both], (int)c8) &&
+                        !GetBit(occupancies[(int)both], (int)b8) &&
+                        (IsSquareAttacked((int)e8, (int)white) != 0) &&
+                        (IsSquareAttacked((int)d8, (int)white) != 0))
+                    {
+                        Console.WriteLine("e8c8 castling move");
+                    }
+                }
+            }
+
+            // generate knight moves
+            if ((side == (int)white) ? piece == (int)N : piece == (int)n)
+            {
+                while (bitboard != 0)
+                {
+                    sourceSquare = GetLs1bIndex(bitboard);
+
+                    attacks = knightAttacks[sourceSquare] &
+                            ((side == (int)white) ? ~occupancies[(int)white] : ~occupancies[(int)black]);
+
+                    while (attacks != 0)
+                    {
+                        targetSquare = GetLs1bIndex(attacks);
+
+                        if (!GetBit(
+                            (side == (int)white) ? occupancies[(int)black] : occupancies[(int)white],
+                            targetSquare))
+                            Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[targetSquare]} piece quiet move");
+                        else
+                            Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[targetSquare]} piece capture");
+
+                        PopBit(ref attacks, targetSquare);
+                    }
+
+                    PopBit(ref bitboard, sourceSquare);
+                }
+            }
+
+            // generate bishop moves
+            if ((side == (int)white) ? piece == (int)B : piece == (int)b)
+            {
+                while (bitboard != 0)
+                {
+                    sourceSquare = GetLs1bIndex(bitboard);
+
+                    attacks = GetBishopAttacks(sourceSquare, occupancies[(int)both]) &
+                            ((side == (int)white) ? ~occupancies[(int)white] : ~occupancies[(int)black]);
+
+                    while (attacks != 0)
+                    {
+                        targetSquare = GetLs1bIndex(attacks);
+
+                        if (!GetBit(
+                            (side == (int)white) ? occupancies[(int)black] : occupancies[(int)white],
+                            targetSquare))
+                            Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[targetSquare]} piece quiet move");
+                        else
+                            Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[targetSquare]} piece capture");
+
+                        PopBit(ref attacks, targetSquare);
+                    }
+
+                    PopBit(ref bitboard, sourceSquare);
+                }
+            }
+
+            // generate rook moves
+            if ((side == (int)white) ? piece == (int)R : piece == (int)r)
+            {
+                while (bitboard != 0)
+                {
+                    sourceSquare = GetLs1bIndex(bitboard);
+
+                    attacks = GetRookAttacks(sourceSquare, occupancies[(int)both]) &
+                            ((side == (int)white) ? ~occupancies[(int)white] : ~occupancies[(int)black]);
+
+                    while (attacks != 0)
+                    {
+                        targetSquare = GetLs1bIndex(attacks);
+
+                        if (!GetBit(
+                            (side == (int)white) ? occupancies[(int)black] : occupancies[(int)white],
+                            targetSquare))
+                            Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[targetSquare]} piece quiet move");
+                        else
+                            Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[targetSquare]} piece capture");
+
+                        PopBit(ref attacks, targetSquare);
+                    }
+
+                    PopBit(ref bitboard, sourceSquare);
+                }
+            }
+
+            // generate queen moves
+            if ((side == (int)white) ? piece == (int)Q : piece == (int)q)
+            {
+                while (bitboard != 0)
+                {
+                    sourceSquare = GetLs1bIndex(bitboard);
+
+                    attacks = GetQueenAttacks(sourceSquare, occupancies[(int)both]) &
+                            ((side == (int)white) ? ~occupancies[(int)white] : ~occupancies[(int)black]);
+
+                    while (attacks != 0)
+                    {
+                        targetSquare = GetLs1bIndex(attacks);
+
+                        if (!GetBit(
+                            (side == (int)white) ? occupancies[(int)black] : occupancies[(int)white],
+                            targetSquare))
+                            Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[targetSquare]} piece quiet move");
+                        else
+                            Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[targetSquare]} piece capture");
+
+                        PopBit(ref attacks, targetSquare);
+                    }
+
+                    PopBit(ref bitboard, sourceSquare);
+                }
+            }
+
+            // generate king moves
+            if ((side == (int)white) ? piece == (int)K : piece == (int)k)
+            {
+                while (bitboard != 0)
+                {
+                    sourceSquare = GetLs1bIndex(bitboard);
+
+                    attacks = kingAttacks[sourceSquare] &
+                            ((side == (int)white) ? ~occupancies[(int)white] : ~occupancies[(int)black]);
+
+                    while (attacks != 0)
+                    {
+                        targetSquare = GetLs1bIndex(attacks);
+
+                        if (!GetBit(
+                            (side == (int)white) ? occupancies[(int)black] : occupancies[(int)white],
+                            targetSquare))
+                            Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[targetSquare]} piece quiet move");
+                        else
+                            Console.WriteLine($"{squareToCoordinates[sourceSquare]}{squareToCoordinates[targetSquare]} piece capture");
+
+                        PopBit(ref attacks, targetSquare);
+                    }
+
+                    PopBit(ref bitboard, sourceSquare);
+                }
+            }
+        }
+    }
 
     public static ulong SetOccupancy(int index, int bitsInMask, ulong attackMask)
     {

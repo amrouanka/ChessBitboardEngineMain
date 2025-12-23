@@ -16,6 +16,7 @@ public enum Piece {P, N, B, R, Q, K, p, n, b, r, q, k};
 
 public enum CastlingRights {wk = 1, wq = 2, bk = 4, bq = 8};
 
+
 // castling rights binary encoding
 /*
 

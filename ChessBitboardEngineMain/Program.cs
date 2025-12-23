@@ -10,14 +10,77 @@ class Program
     public const string KillerPosition = "rnbqkb1r/pp1p1pPp/8/2p1pP2/1P1P4/3P3P/P1P1P3/RNBQKBNR w KQkq e6 0 1";
     public const string CmkPosition = "r2q1rk1/ppp2ppp/2n1bn2/2b1p3/3pP3/3P1NPP/PPP1NPB1/R1BQ1RK1 b - - 0 1";
 
+/*
+          binary move bits                               hexadecimal constants
+    
+    0000 0000 0000 0000 0011 1111    source square       0x3f
+    0000 0000 0000 1111 1100 0000    target square       0xfc0
+    0000 0000 1111 0000 0000 0000    piece               0xf000
+    0000 1111 0000 0000 0000 0000    promoted piece      0xf0000
+    0001 0000 0000 0000 0000 0000    capture flag        0x100000
+    0010 0000 0000 0000 0000 0000    double push flag    0x200000
+    0100 0000 0000 0000 0000 0000    enpassant flag      0x400000
+    1000 0000 0000 0000 0000 0000    castling flag       0x800000
+*/
+    static int EncodeMove(
+        int source,
+        int target,
+        int piece,
+        int promoted,
+        int capture,
+        int @double,
+        int enpassant,
+        int castling)
+    {
+        return
+            source |
+            (target << 6) |
+            (piece << 12) |
+            (promoted << 16) |
+            (capture << 20) |
+            (@double << 21) |
+            (enpassant << 22) |
+            (castling << 23);
+    }
+
+    static int GetMoveSource(int move)     => move & 0x3F;
+
+    static int GetMoveTarget(int move)     => (move & 0xFC0) >> 6;
+
+    static int GetMovePiece(int move)      => (move & 0xF000) >> 12;
+
+    static int GetMovePromoted(int move)   => (move & 0xF0000) >> 16;
+
+    static int GetMoveCapture(int move)    => move & 0x100000;
+
+    static int GetMoveDouble(int move)     => move & 0x200000;
+
+    static int GetMoveEnpassant(int move)  => move & 0x400000;
+
+    static int GetMoveCastling(int move)   => move & 0x800000;
+
     static void Main()
     {
         InitAll();
 
-        ParseFEN(StartPosition);
-        PrintBoard();
+        // create move
+        int move = EncodeMove((int)d7, (int)e8, P, Q, 0, 0, 1, 0);
 
-        PrintAttackedSquares((int)Side.black);
+        // extract move items
+        int sourceSquare = GetMoveSource(move);
+        int targetSquare = GetMoveTarget(move);
+        int piece = GetMovePiece(move);
+        int promotedPiece = GetMovePromoted(move);
+
+        // print move items
+        Console.WriteLine($"source square: {squareToCoordinates[sourceSquare]}");
+        Console.WriteLine($"target square: {squareToCoordinates[targetSquare]}");
+        Console.WriteLine($"piece: {charPieces.First(x => x.Value == piece).Key}");
+        Console.WriteLine($"promoted piece: {charPieces.First(x => x.Value == promotedPiece).Key}");
+        Console.WriteLine($"capture flag: {(GetMoveCapture(move) != 0 ? 1 : 0)}");
+        Console.WriteLine($"double pawn push flag: {(GetMoveDouble(move) != 0 ? 1 : 0)}");
+        Console.WriteLine($"enpassant flag: {(GetMoveEnpassant(move) != 0 ? 1 : 0)}");
+        Console.WriteLine($"castling flag: {(GetMoveCastling(move) != 0 ? 1 : 0)}");
     }
 
     // ASCII pieces
@@ -42,6 +105,18 @@ class Program
         ['r'] = r,
         ['q'] = q,
         ['k'] = k
+    };
+
+    public static readonly string[] squareToCoordinates =
+    {
+        "a8","b8","c8","d8","e8","f8","g8","h8",
+        "a7","b7","c7","d7","e7","f7","g7","h7",
+        "a6","b6","c6","d6","e6","f6","g6","h6",
+        "a5","b5","c5","d5","e5","f5","g5","h5",
+        "a4","b4","c4","d4","e4","f4","g4","h4",
+        "a3","b3","c3","d3","e3","f3","g3","h3",
+        "a2","b2","c2","d2","e2","f2","g2","h2",
+        "a1","b1","c1","d1","e1","f1","g1","h1"
     };
 
     // piece bitboards
