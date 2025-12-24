@@ -2,82 +2,57 @@
 using static Square;
 using static CastlingRights;
 using static PieceAttacks;
+using static MoveFlag;
 using System.Numerics;
 
 class Program
 {
     static void Main()
     {
+        // initialize everything
         InitAll();
 
-        RunSelfTests();
-    }
-    static void RunSelfTests()
-{
-    Console.WriteLine("=== RUNNING ENGINE SELF TESTS ===\n");
+        // parse FEN
+        ParseFEN("r3k2r/p1ppRpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R b KQkq - 0 1");
+        PrintBoard();
 
-    // ---------- FEN TEST ----------
-    ParseFEN(TrickyPosition);
+        // create move list instance
+        MoveList moveList = new MoveList(256);
 
-    int whiteCount = CountBits(occupancies[(int)Side.white]);
-    int blackCount = CountBits(occupancies[(int)Side.black]);
-    int bothCount  = CountBits(occupancies[(int)Side.both]);
+        // generate moves
+        GenerateMoves(ref moveList);
 
-    if (bothCount != whiteCount + blackCount)
-        Console.WriteLine("❌ ERROR: Occupancy mismatch");
-    else
-        Console.WriteLine("✔ Occupancy OK");
+        // start tracking time
+        int start = GetTimeMs();
 
-    // ---------- MOVE GENERATION TEST ----------
-    MoveList moveList = new MoveList(256);
-    GenerateMoves(ref moveList);
+        // loop over generated moves
+        for (int moveCount = 0; moveCount < moveList.count; moveCount++)
+        {
+            // get move
+            int move = moveList.moves[moveCount];
 
-    if (moveList.count == 0)
-        Console.WriteLine("❌ ERROR: No moves generated");
-    else
-        Console.WriteLine($"✔ Generated {moveList.count} moves");
+            // preserve board state
+            var boardState = CopyBoard();
 
-    // ---------- MOVE VALIDATION ----------
-    HashSet<int> seenMoves = new HashSet<int>();
+            // make move
+            if (MakeMove(move, (int)allMoves) == 0)
+                continue;
 
-    for (int i = 0; i < moveList.count; i++)
-    {
-        int move = moveList.moves[i];
+            PrintBoard();
+            Console.ReadKey();
 
-        int src = GetMoveSource(move);
-        int trg = GetMoveTarget(move);
-        int piece = GetMovePiece(move);
+            // take back
+            TakeBack(boardState);
+            PrintBoard();
+            Console.ReadKey();
+        }
 
-        // source / target range
-        if (src < 0 || src > 63 || trg < 0 || trg > 63)
-            Console.WriteLine($"❌ Invalid square index in move {i}");
-
-        // piece range
-        if (piece < P || piece > k)
-            Console.WriteLine($"❌ Invalid piece in move {i}");
-
-        // illegal flag combos
-        if (GetMoveDouble(move) != 0 && GetMoveCapture(move) != 0)
-            Console.WriteLine($"❌ Double push + capture at move {i}");
-
-        // duplicate moves
-        if (!seenMoves.Add(move))
-            Console.WriteLine($"❌ Duplicate move detected at index {i}");
+        // time taken to execute program
+        Console.WriteLine($"Time taken to execute: {GetTimeMs() - start} ms");
+        Console.ReadKey();
     }
 
-    Console.WriteLine("✔ Move validation complete");
-
-    // ---------- ENPASSANT SANITY ----------
-    if (enPassant != (int)Square.noSquare)
-    {
-        if (enPassant < 0 || enPassant > 63)
-            Console.WriteLine("❌ Invalid enpassant square");
-        else
-            Console.WriteLine("✔ Enpassant square OK");
-    }
-
-    Console.WriteLine("\n=== SELF TESTS COMPLETE ===\n");
-}
+    public static int GetTimeMs() => Environment.TickCount;
 
     public const string EmptyBoard = "8/8/8/8/8/8/8/8 w - - ";
     public const string StartPosition = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -97,6 +72,162 @@ class Program
     0100 0000 0000 0000 0000 0000    enpassant flag      0x400000
     1000 0000 0000 0000 0000 0000    castling flag       0x800000
 */
+    static readonly int[] castlingRights =
+    [
+        7, 15, 15, 15,  3, 15, 15, 11,
+        15, 15, 15, 15, 15, 15, 15, 15,
+        15, 15, 15, 15, 15, 15, 15, 15,
+        15, 15, 15, 15, 15, 15, 15, 15,
+        15, 15, 15, 15, 15, 15, 15, 15,
+        15, 15, 15, 15, 15, 15, 15, 15,
+        15, 15, 15, 15, 15, 15, 15, 15,
+        13, 15, 15, 15, 12, 15, 15, 14
+    ];
+
+    static int MakeMove(int move, int moveFlag)
+    {
+        // quiet moves
+        if (moveFlag == (int)MoveFlag.allMoves)
+        {
+            // preserve board state
+            BoardState state = CopyBoard();
+
+            // parse move
+            int sourceSquare   = GetMoveSource(move);
+            int targetSquare   = GetMoveTarget(move);
+            int piece          = GetMovePiece(move);
+            int promotedPiece  = GetMovePromoted(move);
+            int capture        = GetMoveCapture(move);
+            int doublePush     = GetMoveDouble(move);
+            int enpass         = GetMoveEnpassant(move);
+            int castling       = GetMoveCastling(move);
+
+            // move piece
+            PopBit(ref bitboards[piece], sourceSquare);
+            SetBit(ref bitboards[piece], targetSquare);
+
+            // handle captures
+            if (capture != 0)
+            {
+                int startPiece, endPiece;
+
+                if (side == (int)Side.white)
+                {
+                    startPiece = p;
+                    endPiece = k;
+                }
+                else
+                {
+                    startPiece = P;
+                    endPiece = K;
+                }
+
+                for (int bbPiece = startPiece; bbPiece <= endPiece; bbPiece++)
+                {
+                    if (GetBit(bitboards[bbPiece], targetSquare))
+                    {
+                        PopBit(ref bitboards[bbPiece], targetSquare);
+                        break;
+                    }
+                }
+            }
+
+            // handle promotions
+            if (promotedPiece != 0)
+            {
+                PopBit(ref bitboards[(side == (int)Side.white) ? P : p], targetSquare);
+                SetBit(ref bitboards[promotedPiece], targetSquare);
+            }
+
+            // handle en passant capture
+            if (enpass != 0)
+            {
+                if (side == (int)Side.white)
+                    PopBit(ref bitboards[p], targetSquare + 8);
+                else
+                    PopBit(ref bitboards[P], targetSquare - 8);
+            }
+
+            // reset en passant
+            enPassant = (int)Square.noSquare;
+
+            // handle double pawn push
+            if (doublePush != 0)
+            {
+                enPassant = (side == (int)Side.white)
+                    ? targetSquare + 8
+                    : targetSquare - 8;
+            }
+
+            // handle castling
+            if (castling != 0)
+            {
+                switch ((Square)targetSquare)
+                {
+                    case Square.g1:
+                        PopBit(ref bitboards[R], (int)Square.h1);
+                        SetBit(ref bitboards[R], (int)Square.f1);
+                        break;
+
+                    case Square.c1:
+                        PopBit(ref bitboards[R], (int)Square.a1);
+                        SetBit(ref bitboards[R], (int)Square.d1);
+                        break;
+
+                    case Square.g8:
+                        PopBit(ref bitboards[r], (int)Square.h8);
+                        SetBit(ref bitboards[r], (int)Square.f8);
+                        break;
+
+                    case Square.c8:
+                        PopBit(ref bitboards[r], (int)Square.a8);
+                        SetBit(ref bitboards[r], (int)Square.d8);
+                        break;
+                }
+            }
+
+            // update castling rights
+            castle &= castlingRights[sourceSquare];
+            castle &= castlingRights[targetSquare];
+
+            // reset occupancies
+            Array.Clear(occupancies, 0, occupancies.Length);
+
+            for (int bbPiece = P; bbPiece <= K; bbPiece++)
+                occupancies[(int)Side.white] |= bitboards[bbPiece];
+
+            for (int bbPiece = p; bbPiece <= k; bbPiece++)
+                occupancies[(int)Side.black] |= bitboards[bbPiece];
+
+            occupancies[(int)Side.both] =
+                occupancies[(int)Side.white] | occupancies[(int)Side.black];
+
+            // change side
+            side ^= 1;
+
+            // illegal move: king in check
+            int kingSquare = (side == (int)Side.white)
+                ? GetLs1bIndex(bitboards[k])
+                : GetLs1bIndex(bitboards[K]);
+
+            if (IsSquareAttacked(kingSquare, side) != 0)
+            {
+                TakeBack(state);
+                return 0;
+            }
+
+            return 1;
+        }
+        else
+        {
+            // capture-only mode
+            if (GetMoveCapture(move) != 0)
+                return MakeMove(move, (int)MoveFlag.allMoves);
+
+            return 0;
+        }
+    }
+
     static int EncodeMove(
         int source,
         int target,
@@ -144,6 +275,36 @@ class Program
             moves = new int[capacity];
             count = 0;
         }
+    }
+
+    public struct BoardState
+    {
+        public ulong[] bitboards;
+        public ulong[] occupancies;
+        public int side;
+        public int enPassant;
+        public int castle;
+    }
+
+    public static BoardState CopyBoard()
+    {
+        return new BoardState
+        {
+            bitboards = (ulong[])bitboards.Clone(),
+            occupancies = (ulong[])occupancies.Clone(),
+            side = side,
+            enPassant = enPassant,
+            castle = castle
+        };
+    }
+
+    public static void TakeBack(BoardState state)
+    {
+        Array.Copy(state.bitboards, bitboards, 12);
+        Array.Copy(state.occupancies, occupancies, 3);
+        side = state.side;
+        enPassant = state.enPassant;
+        castle = state.castle;
     }
 
      // generate all moves
