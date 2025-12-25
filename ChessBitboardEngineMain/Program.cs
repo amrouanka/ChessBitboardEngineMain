@@ -7,11 +7,26 @@ class Program
     static void Main()
     {
         PieceAttacks.InitAll();
-        Board.ParseFEN(TrickyPosition);
-        Board.PrintBoard();
 
-        nodes = 0;
-        PerftTest(4);
+        // Debug mode variable
+        bool debug = false;
+
+        if (debug)
+        {
+            // Parse FEN and print board
+            Board.ParseFEN(TrickyPosition);
+            Board.PrintBoard();
+
+            // Placeholder for evaluation when you implement it
+            Console.WriteLine($"score: {Evaluation.Evaluate()}");
+
+            Search.SearchPosition(3);
+        }
+        else
+        {
+            // Connect to the GUI
+            Uci.UciLoop();
+        }
     }
 
     static long nodes;
