@@ -1,3 +1,4 @@
+
 using System.Drawing;
 using static Board;
 using static MoveEncoding;
