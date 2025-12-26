@@ -1,9 +1,9 @@
-using static Side;
-using static Square;
-using static CastlingRights;
 using static Board;
+using static CastlingRights;
 using static MoveEncoding;
 using static PieceAttacks;
+using static Side;
+using static Square;
 
 public static class MoveGenerator
 {

@@ -1,6 +1,6 @@
+using static CastlingRights;
 using static Side;
 using static Square;
-using static CastlingRights;
 
 public static class Board
 {

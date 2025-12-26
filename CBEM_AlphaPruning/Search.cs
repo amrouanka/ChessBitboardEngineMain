@@ -9,7 +9,7 @@ public static class Search
     private static int ply;
 
     // best move
-    private static int best_move;
+    private static int bestMove;
 
     // nodes counter
     private static long nodes;
@@ -24,6 +24,10 @@ public static class Search
 
         // increment nodes count
         nodes++;
+
+        bool inCheck = PieceAttacks.IsSquareAttacked((side == (int)Side.white) ? BitboardOperations.GetLs1bIndex(bitboards[K]) : BitboardOperations.GetLs1bIndex(bitboards[k]), side ^ 1);
+
+        int legalMoves = 0;
 
         // best move so far
         int best_sofar = 0;
@@ -52,6 +56,8 @@ public static class Search
 
             // increment ply
             ply++;
+
+            legalMoves++;
 
             // score current move
             int score = -Negamax(-beta, -alpha, depth - 1);
@@ -82,10 +88,20 @@ public static class Search
             }
         }
 
+        if (legalMoves == 0)
+        {
+            if (inCheck)
+            {
+                // return mating score (assuming closest distnce to mating position)
+                return -49000 + ply;
+            }
+            else return 0;  // stalemate
+        }
+
         // found better move
         if (old_alpha != alpha)
             // init best move
-            best_move = best_sofar;
+            bestMove = best_sofar;
 
         // node (move) fails low
         return alpha;
@@ -94,13 +110,18 @@ public static class Search
     // Main search routine using negamax with alpha-beta pruning
     public static void SearchPosition(int depth)
     {
-        // reset nodes counter
         nodes = 0;
 
         // find best move within a given position
         int score = Negamax(-50000, 50000, depth);
 
-        // best move placeholder
-        Console.WriteLine($"bestmove {GetMove(best_move)}");
+        if (bestMove != 0)
+        {
+            // print search info
+            Console.WriteLine($"info score cp {score} depth {depth} nodes {nodes}");
+
+            // best move placeholder
+            Console.WriteLine($"bestmove {GetMove(bestMove)}");
+        }
     }
 }
